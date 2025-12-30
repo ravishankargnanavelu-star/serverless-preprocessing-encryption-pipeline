@@ -1,0 +1,59 @@
+{
+  "Comment": "Serverless preprocessing and conditional encryption pipeline",
+  "StartAt": "PreprocessingJob",
+  "States": {
+    "PreprocessingJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "preprocessing_glue_job"
+      },
+      "Next": "ReadRecordCount"
+    },
+
+    "ReadRecordCount": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "ReadRecordCount",
+        "Payload.$": "$"
+      },
+      "Next": "CheckRecordCount"
+    },
+
+    "CheckRecordCount": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.recordResult.record_count",
+          "NumericGreaterThan": 0,
+          "Next": "EncryptionJob"
+        }
+      ],
+      "Default": "SuccessState"
+    },
+
+    "EncryptionJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "encryption_glue_job"
+      },
+      "Next": "CatalogLambda"
+    },
+
+    "CatalogLambda": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "CatalogLambda",
+        "Payload.$": "$"
+      },
+      "End": true
+    },
+
+    "SuccessState": {
+      "Type": "Succeed"
+    }
+  }
+}
